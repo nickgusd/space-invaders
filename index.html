@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Futurama Space Invaders - Max Width and Boss</title>
+    <title>Futurama Space Invaders - Max Width and Bosses</title>
     <style>
         body {
             margin: 0;
@@ -50,12 +50,17 @@
             height: 30,
             speed: 8,
             dx: 0,
+            dy: 0,
             health: 100,
             maxHealth: 100,
             multiShot: 1,
             multiShotTimer: 0,
             score: 0,
-            slurmCount: 0
+            slurmCount: 0,
+            hasLightsaber: false,
+            lightsaberEnergy: 0,
+            maxLightsaberEnergy: 300,
+            lightsaberActive: false
         };
 
         let invaders = [];
@@ -72,12 +77,23 @@
         const powerUpWidth = 30;
         const powerUpHeight = 30;
 
+        let healthItems = [];
+        const healthItemWidth = 40;
+        const healthItemHeight = 40;
+
+        let lightsaberItems = [];
+        const lightsaberWidth = 40;
+        const lightsaberHeight = 40;
+
         let level = 1;
         let isCharging = false;
         let chargeTime = 0;
         let rightPressed = false;
         let leftPressed = false;
+        let upPressed = false;
+        let downPressed = false;
         let spacePressed = false;
+        let bossDefeatedThisLevel = false;
 
         const omicronianImg = new Image();
         let omicronianLoaded = false;
@@ -115,51 +131,72 @@
         bossImg.onerror = () => { console.error('Failed to load Boss SVG:', bossImg.src); };
         bossImg.src = 'assets/enemy_spacecraft.svg';
 
+        const healthItemImg = new Image();
+        let healthItemLoaded = false;
+        healthItemImg.onload = () => { healthItemLoaded = true; console.log('Health Item SVG loaded'); };
+        healthItemImg.onerror = () => { console.error('Failed to load Health Item SVG:', healthItemImg.src); };
+        healthItemImg.src = 'assets/planet-svgrepo-com.svg';
+
+        const lightsaberImg = new Image();
+        let lightsaberLoaded = false;
+        lightsaberImg.onload = () => { lightsaberLoaded = true; console.log('Lightsaber SVG loaded'); };
+        lightsaberImg.onerror = () => { console.error('Failed to load Lightsaber SVG:', lightsaberImg.src); };
+        lightsaberImg.src = 'assets/lightsaber-svgrepo-com.svg';
+
         window.addEventListener('resize', () => {
             canvas.width = Math.min(window.innerWidth, maxWidth);
             canvas.height = window.innerHeight;
             player.x = canvas.width / 2 - 25;
-            player.y = canvas.height - 50;
+            player.y = Math.min(player.y, canvas.height - 50);
         });
 
         function spawnInvaders() {
             invaders = [];
-            let invaderCount = 5 + level * 2;
+            bossDefeatedThisLevel = false;
 
-            if (level === 10) {
-                invaders.push({
-                    x: canvas.width / 2 - 75,
-                    y: 50,
-                    width: 150,
-                    height: 100,
-                    alive: true,
-                    dx: (Math.random() - 0.5) * 8,
-                    dy: baseInvaderSpeed * 2,
-                    type: 'boss',
-                    health: 40, // 5x Alien2's 8
-                    maxHealth: 40,
-                    hitThisFrame: false,
-                    shootTimer: Math.random() * 30 + 15
-                });
+            if (level >= 10 && (level % 5 === 0)) {
+                const bossCount = level >= 25 ? 2 : 1;
+                for (let i = 0; i < bossCount; i++) {
+                    invaders.push({
+                        x: canvas.width / 2 - 75 + (i * 200 - (bossCount - 1) * 100),
+                        y: 50,
+                        width: 150,
+                        height: 100,
+                        alive: true,
+                        dx: (Math.random() - 0.5) * 10,
+                        dy: baseInvaderSpeed * 0.75,
+                        type: 'boss',
+                        health: 80,
+                        maxHealth: 80,
+                        hitThisFrame: false,
+                        shootTimer: Math.random() * 30 + 15
+                    });
+                }
             } else {
+                let invaderCount = Math.min(15 + level, 25);
+                let omicronianChance = Math.max(0.9 - level * 0.03, 0.3);
+                let alien2Chance = Math.min(level * 0.02, 0.5);
+
                 for (let i = 0; i < invaderCount; i++) {
                     let type = 'omicronian';
                     let width = invaderWidth;
                     let height = invaderHeight;
-                    let speedMultiplier = 1;
-                    let maxHealth = 1;
+                    let speedMultiplier = 0.8;
+                    let maxHealth = 1 + Math.floor(level / 5);
 
-                    if (level >= 3 && Math.random() < 0.2) {
-                        type = 'brainSlug';
-                        width = 40;
-                        height = 40;
-                        speedMultiplier = 1.5;
-                    } else if (level >= 5 && Math.random() < 0.15) {
+                    const rand = Math.random();
+                    if (rand < alien2Chance && level >= 5) {
                         type = 'robotDevil';
                         width = 50;
                         height = 50;
-                        speedMultiplier = 2;
-                        maxHealth = 8;
+                        speedMultiplier = 1.6;
+                        maxHealth = 8 + Math.floor(level / 5);
+                    } else if (rand > omicronianChance && level >= 3) {
+                        type = 'brainSlug';
+                        width = 40;
+                        height = 40;
+                        speedMultiplier = 1.2;
+                        maxHealth = 2 + Math.floor(level / 5);
                     }
 
                     invaders.push({
@@ -168,13 +205,24 @@
                         width: width,
                         height: height,
                         alive: true,
-                        dx: (Math.random() - 0.5) * 8,
+                        dx: (Math.random() - 0.5) * 10,
                         dy: baseInvaderSpeed * speedMultiplier,
                         type: type,
                         health: maxHealth,
                         maxHealth: maxHealth,
                         hitThisFrame: false,
                         shootTimer: type === 'robotDevil' ? Math.random() * 90 + 45 : 0
+                    });
+                }
+
+                if (level >= 14 && ((level - 14) % 7 === 0)) { // Starts at 14, then every 7
+                    console.log(`Attempting to spawn lightsaber at Level ${level}`);
+                    lightsaberItems.push({
+                        x: Math.random() * (canvas.width - lightsaberWidth),
+                        y: 0,
+                        width: lightsaberWidth,
+                        height: lightsaberHeight,
+                        dy: 2
                     });
                 }
             }
@@ -193,11 +241,30 @@
             }
         }
 
+        function spawnHealthItem(x, y) {
+            if (!bossDefeatedThisLevel && level >= 10 && (level % 10 === 0)) { // Every other boss: 10, 20, 30
+                console.log(`Spawning health item at Level ${level}, x: ${x}, y: ${y}`);
+                console.log(`Before push - Health items count: ${healthItems.length}`);
+                healthItems.push({
+                    x: x,
+                    y: y,
+                    width: healthItemWidth,
+                    height: healthItemHeight,
+                    dy: 2,
+                    spawnedFrame: performance.now()
+                });
+                console.log(`After push - Health items count: ${healthItems.length}`);
+                bossDefeatedThisLevel = true;
+            }
+        }
+
         spawnInvaders();
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowRight') rightPressed = true;
             else if (e.key === 'ArrowLeft') leftPressed = true;
+            else if (e.key === 'ArrowUp') upPressed = true;
+            else if (e.key === 'ArrowDown') downPressed = true;
             else if (e.key === ' ' && !isCharging) {
                 spacePressed = true;
                 isCharging = true;
@@ -208,9 +275,11 @@
         document.addEventListener('keyup', (e) => {
             if (e.key === 'ArrowRight') rightPressed = false;
             else if (e.key === 'ArrowLeft') leftPressed = false;
+            else if (e.key === 'ArrowUp') upPressed = false;
+            else if (e.key === 'ArrowDown') downPressed = false;
             else if (e.key === ' ') {
                 spacePressed = false;
-                if (isCharging) {
+                if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
                     const bulletWidth = Math.min(chargeTime * 3, 30);
                     const bulletHeight = Math.min(chargeTime * 3, 50);
                     const spread = player.multiShot > 1 ? 15 : 0;
@@ -224,9 +293,9 @@
                             damage: bulletWidth / 4
                         });
                     }
-                    isCharging = false;
-                    chargeTime = 0;
                 }
+                isCharging = false;
+                chargeTime = 0;
             }
         });
 
@@ -234,17 +303,31 @@
             invaders.forEach(invader => invader.hitThisFrame = false);
 
             player.dx = 0;
+            player.dy = 0;
             if (rightPressed && player.x < canvas.width - player.width) player.dx = player.speed;
             if (leftPressed && player.x > 0) player.dx = -player.speed;
+            if (upPressed && player.y > 0) player.dy = -player.speed;
+            if (downPressed && player.y < canvas.height - player.height) player.dy = player.speed;
             player.x += player.dx;
+            player.y += player.dy;
 
-            if (isCharging) {
+            if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
                 chargeTime += 0.5;
             }
+
+            player.lightsaberActive = player.hasLightsaber && spacePressed && player.lightsaberEnergy > 0;
 
             if (player.multiShotTimer > 0) {
                 player.multiShotTimer--;
                 if (player.multiShotTimer <= 0) player.multiShot = 1;
+            }
+
+            if (player.lightsaberActive) {
+                player.lightsaberEnergy--;
+                if (player.lightsaberEnergy <= 0) {
+                    player.hasLightsaber = false;
+                    player.lightsaberActive = false;
+                }
             }
 
             bullets.forEach((bullet, index) => {
@@ -267,6 +350,63 @@
                 }
             });
 
+            console.log(`Before healthItems update - Count: ${healthItems.length}`);
+            healthItems.forEach((item, index) => {
+                console.log(`Health item position: x=${item.x}, y=${item.y}`);
+                item.y += item.dy;
+                if (performance.now() - item.spawnedFrame > 100) {
+                    if (
+                        item.x < player.x + player.width &&
+                        item.x + item.width > player.x &&
+                        item.y < player.y + player.height &&
+                        item.y + item.height > player.y
+                    ) {
+                        console.log(`Collected health item at x: ${item.x}, y: ${item.y}`);
+                        player.health = Math.min(player.maxHealth, player.health + 50);
+                        healthItems.splice(index, 1);
+                    } else if (item.y > canvas.height) {
+                        console.log(`Removing health item at y: ${item.y}`);
+                        healthItems.splice(index, 1);
+                    }
+                }
+            });
+            console.log(`After healthItems update - Count: ${healthItems.length}`);
+
+            lightsaberItems.forEach((item, index) => {
+                item.y += item.dy;
+                if (item.y > canvas.height) {
+                    lightsaberItems.splice(index, 1);
+                } else if (
+                    item.x < player.x + player.width &&
+                    item.x + item.width > player.x &&
+                    item.y < player.y + player.height &&
+                    item.y + item.height > player.y
+                ) {
+                    player.hasLightsaber = true;
+                    player.lightsaberEnergy = player.maxLightsaberEnergy;
+                    lightsaberItems.splice(index, 1);
+                }
+            });
+
+            if (player.lightsaberActive) {
+                invaders.forEach((invader, index) => {
+                    if (invader.alive && !invader.hitThisFrame &&
+                        invader.x + invader.width > player.x &&
+                        invader.x < player.x + player.width &&
+                        invader.y < player.y) {
+                        invader.health -= 2;
+                        invader.hitThisFrame = true;
+                        if (invader.health <= 0) {
+                            invader.alive = false;
+                            player.score += invader.type === 'omicronian' ? 10 : invader.type === 'brainSlug' ? 20 : invader.type === 'robotDevil' ? 50 : 100;
+                            if (invader.type === 'boss') {
+                                spawnHealthItem(invader.x + invader.width / 2 - healthItemWidth / 2, invader.y + invader.height / 2);
+                            }
+                        }
+                    }
+                });
+            }
+
             invaders.forEach((invader, index) => {
                 if (invader.alive) {
                     invader.x += invader.dx;
@@ -277,7 +417,7 @@
                         invader.dx += (Math.random() - 0.5) * 2;
                     }
                     if (Math.random() < 0.1) {
-                        invader.dx = (Math.random() - 0.5) * 8;
+                        invader.dx = (Math.random() - 0.5) * 10;
                     }
 
                     if (invader.x < player.x + player.width &&
@@ -297,7 +437,7 @@
                     if (invader.type === 'robotDevil' || invader.type === 'boss') {
                         invader.shootTimer--;
                         if (invader.shootTimer <= 0) {
-                            const bulletWidth = invader.type === 'boss' ? 20 : 10; // Larger blasts for boss
+                            const bulletWidth = invader.type === 'boss' ? 20 : 10;
                             const bulletHeight = invader.type === 'boss' ? 20 : 10;
                             enemyBullets.push({
                                 x: invader.x + invader.width / 2 - bulletWidth / 2,
@@ -324,7 +464,6 @@
                 ) {
                     player.slurmCount++;
                     player.multiShot = player.slurmCount >= 2 ? 5 : Math.min(3, level);
-                    player.multiShotTimer = 300;
                     powerUps.splice(index, 1);
                 }
             });
@@ -342,6 +481,9 @@
                         if (invader.health <= 0) {
                             invader.alive = false;
                             player.score += invader.type === 'omicronian' ? 10 : invader.type === 'brainSlug' ? 20 : invader.type === 'robotDevil' ? 50 : 100;
+                            if (invader.type === 'boss') {
+                                spawnHealthItem(invader.x + invader.width / 2 - healthItemWidth / 2, invader.y + invader.height / 2);
+                            }
                         }
                         return;
                     }
@@ -378,9 +520,21 @@
                 ctx.fillText('Planet Express', player.x, player.y - 5);
             }
 
-            if (isCharging) {
+            if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
                 ctx.fillStyle = '#FFFF00';
                 ctx.fillRect(player.x, player.y - 10, Math.min(chargeTime * 2, 50), 5);
+            }
+
+            if (player.lightsaberActive) {
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(player.x + player.width / 2 - 5, 0, 10, player.y);
+            }
+
+            if (player.hasLightsaber && player.lightsaberEnergy > 0) {
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(canvas.width - 210, 10, 200, 10);
+                ctx.fillStyle = '#00FFFF';
+                ctx.fillRect(canvas.width - 210, 10, (player.lightsaberEnergy / player.maxLightsaberEnergy) * 200, 10);
             }
 
             ctx.fillStyle = '#FF0000';
@@ -400,10 +554,9 @@
                     } else if (invader.type === 'robotDevil' && alien2Loaded) {
                         ctx.drawImage(alien2Img, invader.x, invader.y, invader.width, invader.height);
                     } else if (invader.type === 'boss' && bossLoaded) {
-                        // Flip boss SVG upside down
                         ctx.save();
                         ctx.translate(invader.x + invader.width / 2, invader.y + invader.height / 2);
-                        ctx.scale(1, -1); // Flip vertically
+                        ctx.scale(1, -1);
                         ctx.drawImage(bossImg, -invader.width / 2, -invader.height / 2, invader.width, invader.height);
                         ctx.restore();
                     } else if (invader.type === 'omicronian') {
@@ -430,12 +583,16 @@
 
             ctx.fillStyle = '#FFFF00';
             bullets.forEach(bullet => {
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.beginPath();
+                ctx.arc(bullet.x + bullet.width / 2, bullet.y + bullet.height / 2, bullet.width / 2, 0, Math.PI * 2);
+                ctx.fill();
             });
 
             ctx.fillStyle = '#FF0000';
             enemyBullets.forEach(bullet => {
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.beginPath();
+                ctx.arc(bullet.x + bullet.width / 2, bullet.y + bullet.height / 2, bullet.width / 2, 0, Math.PI * 2);
+                ctx.fill();
             });
 
             powerUps.forEach(powerUp => {
@@ -446,6 +603,24 @@
                     ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillText('Slurm', powerUp.x, powerUp.y - 5);
+                }
+            });
+
+            lightsaberItems.forEach(item => {
+                if (lightsaberLoaded) {
+                    ctx.drawImage(lightsaberImg, item.x, item.y, item.width, item.height);
+                } else {
+                    ctx.fillStyle = '#FF00FF';
+                    ctx.fillRect(item.x, item.y, item.width, item.height);
+                }
+            });
+
+            healthItems.forEach(item => {
+                if (healthItemLoaded) {
+                    ctx.drawImage(healthItemImg, item.x, item.y, item.width, item.height);
+                } else {
+                    ctx.fillStyle = '#00FFFF';
+                    ctx.fillRect(item.x, item.y, item.width, item.height);
                 }
             });
 
