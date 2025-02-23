@@ -31,8 +31,12 @@
         const ctx = canvas.getContext('2d');
 
         const maxWidth = 1080;
-        canvas.width = Math.min(window.innerWidth, maxWidth);
-        canvas.height = window.innerHeight; // Use actual inner height
+        function updateCanvasSize() {
+            canvas.width = Math.min(window.innerWidth, maxWidth);
+            canvas.height = window.innerHeight;
+            console.log(`Canvas resized: ${canvas.width}x${canvas.height}`);
+        }
+        updateCanvasSize();
 
         const backgroundImg = new Image();
         let backgroundLoaded = false;
@@ -47,7 +51,7 @@
 
         const player = {
             x: canvas.width / 2 - 25,
-            y: canvas.height - 100, // Adjusted higher to be visible
+            y: canvas.height - 60,
             width: 50,
             height: 30,
             speed: 8,
@@ -64,6 +68,7 @@
             maxLightsaberEnergy: 300,
             lightsaberActive: false
         };
+        player.y = canvas.height - player.height * 2;
 
         let invaders = [];
         const invaderWidth = 60;
@@ -150,12 +155,10 @@
         lightsaberImg.onerror = () => { console.error('Failed to load Lightsaber SVG:', lightsaberImg.src); };
         lightsaberImg.src = 'assets/lightsaber-svgrepo-com.svg';
 
-        // Adjust canvas and player on resize
         window.addEventListener('resize', () => {
-            canvas.width = Math.min(window.innerWidth, maxWidth);
-            canvas.height = window.innerHeight;
+            updateCanvasSize();
             player.x = Math.min(player.x, canvas.width - player.width);
-            player.y = Math.min(player.y, canvas.height - 100); // Adjusted higher
+            player.y = Math.min(player.y, canvas.height - player.height * 2);
         });
 
         // Touch event listeners
@@ -178,8 +181,8 @@
                 const touch = e.touches[0];
                 const deltaX = touch.clientX - touchStartX;
                 player.dx = deltaX > 0 ? player.speed : -player.speed;
-                if (Math.abs(deltaX) < 5) player.dx = 0; // Dead zone
-                console.log(`Touch move - deltaX: ${deltaX}, dx: ${player.dx}`);
+                if (Math.abs(deltaX) < 5) player.dx = 0;
+                console.log(`Touch move - deltaX: ${deltaX}, dx: ${player.dx}, player.x: ${player.x}`);
                 touchStartX = touch.clientX;
             }
         });
