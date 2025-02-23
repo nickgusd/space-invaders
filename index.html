@@ -56,6 +56,8 @@
         };
         backgroundImg.src = 'assets/grok_space.jpg';
 
+        // Adjust maxLightsaberEnergy based on device (mobile vs. desktop)
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const player = {
             x: canvas.width / 2 - 25,
             y: canvas.height - 160, // Adjusted for Chrome (~160px from bottom)
@@ -72,7 +74,7 @@
             slurmCount: 0,
             hasLightsaber: false,
             lightsaberEnergy: 0,
-            maxLightsaberEnergy: 450, // Increased from 300 to 450 for longer duration
+            maxLightsaberEnergy: isMobile ? 300 : 450, // 300 on mobile, 450 on desktop
             lightsaberActive: false
         };
         player.y = Math.max(0, Math.min(canvas.height - player.height * 5.3, canvas.height - 160)); // Dynamic, ~160px from bottom
@@ -99,7 +101,7 @@
         const lightsaberWidth = 40;
         const lightsaberHeight = 40;
 
-        let level = 14;
+        let level = 1;
         let isCharging = false;
         let chargeTime = 0;
         let rightPressed = false;
@@ -112,7 +114,6 @@
         let touchActive = false;
         let touchStartX = 0;
         let touchStartTime = 0;
-        // Removed touchHoldThreshold since we’re using tap for laser on mobile
 
         const omicronianImg = new Image();
         let omicronianLoaded = false;
@@ -201,8 +202,8 @@
             if (isCharging) {
                 // On mobile, tap triggers either bullets or laser (no hold required)
                 if (player.hasLightsaber && player.lightsaberEnergy > 0) {
-                    player.lightsaberActive = true; // Activate laser with tap
-                    console.log(`Activating laser with tap, initial energy: ${player.lightsaberEnergy}`);
+                    player.lightsaberActive = !player.lightsaberActive; // Toggle laser on/off with tap
+                    console.log(`Toggling laser, active: ${player.lightsaberActive}, initial energy: ${player.lightsaberEnergy}`);
                 } else {
                     const bulletWidth = Math.min(chargeTime * 3, 30);
                     const bulletHeight = Math.min(chargeTime * 3, 50);
@@ -221,7 +222,7 @@
             }
             isCharging = false;
             chargeTime = 0;
-            // Laser deactivates on touch end unless energy depletes in update()
+            // Laser deactivates on touch end if toggled off or energy depletes
             if (!player.hasLightsaber || player.lightsaberEnergy <= 0) {
                 player.lightsaberActive = false;
             }
@@ -362,7 +363,7 @@
         }
 
         function spawnHealthItem(x, y) {
-            if (!bossDefeatedThisLevel && level >= 10 && (level % 10 === 0)) {
+            if (!bossDefeatedThisLevel && level >= 20 && (level % 10 === 0)) { // Changed from level >= 10 to level >= 20
                 console.log(`Spawning health item at Level ${level}, x: ${x}, y: ${y}`);
                 console.log(`Before push - Health items count: ${healthItems.length}`);
                 healthItems.push({
