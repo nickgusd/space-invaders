@@ -20,7 +20,7 @@
             display: block;
             max-width: 1080px;
             width: 100%;
-            height: 100%;
+            height: 100%; /* Fallback */
         }
     </style>
 </head>
@@ -32,11 +32,17 @@
 
         const maxWidth = 1080;
         function updateCanvasSize() {
+            // Use visualViewport for mobile, fallback to innerHeight
+            const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
             canvas.width = Math.min(window.innerWidth, maxWidth);
-            canvas.height = window.innerHeight;
+            canvas.height = height;
             console.log(`Canvas resized: ${canvas.width}x${canvas.height}`);
         }
         updateCanvasSize();
+
+        // Handle viewport changes (e.g., keyboard, orientation)
+        window.addEventListener('resize', updateCanvasSize);
+        window.visualViewport?.addEventListener('resize', updateCanvasSize);
 
         const backgroundImg = new Image();
         let backgroundLoaded = false;
@@ -51,7 +57,7 @@
 
         const player = {
             x: canvas.width / 2 - 25,
-            y: canvas.height - 60,
+            y: canvas.height - 90, // Adjusted higher for iPhone safe areas
             width: 50,
             height: 30,
             speed: 8,
@@ -68,7 +74,7 @@
             maxLightsaberEnergy: 300,
             lightsaberActive: false
         };
-        player.y = canvas.height - player.height * 2;
+        player.y = Math.max(0, Math.min(canvas.height - player.height * 3, canvas.height - 90)); // Dynamic, ~90px from bottom
 
         let invaders = [];
         const invaderWidth = 60;
@@ -155,12 +161,6 @@
         lightsaberImg.onerror = () => { console.error('Failed to load Lightsaber SVG:', lightsaberImg.src); };
         lightsaberImg.src = 'assets/lightsaber-svgrepo-com.svg';
 
-        window.addEventListener('resize', () => {
-            updateCanvasSize();
-            player.x = Math.min(player.x, canvas.width - player.width);
-            player.y = Math.min(player.y, canvas.height - player.height * 2);
-        });
-
         // Touch event listeners
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
@@ -168,7 +168,7 @@
             touchActive = true;
             touchStartX = touch.clientX;
             touchStartTime = performance.now();
-            console.log(`Touch start at x: ${touchStartX}`);
+            console.log(`Touch start at x: ${touchStartX}, y: ${touch.clientY}`);
             if (!isCharging) {
                 isCharging = true;
                 chargeTime = 0;
