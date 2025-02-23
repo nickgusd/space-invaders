@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Futurama Space Invaders - Mobile Friendly</title>
     <style>
         body {
@@ -14,7 +14,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            touch-action: none;
+            touch-action: manipulation; /* Changed from 'none' to allow swiping */
         }
         canvas {
             display: block;
@@ -32,10 +32,9 @@
 
         const maxWidth = 1080;
         function updateCanvasSize() {
-            // Use visualViewport for mobile, fallback to innerHeight for consistency
+            // Use visualViewport for mobile, fallback to innerHeight with safety check for iPhone 14 Pro Max
             const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            // Ensure minimum height for iPhone 14 Pro Max (~926px usable)
-            const safeHeight = Math.max(height, 926); // Adjust if needed
+            const safeHeight = Math.max(height, 900); // Reduced from 926 to account for Chrome
             canvas.width = Math.min(window.innerWidth, maxWidth);
             canvas.height = safeHeight;
             console.log(`Canvas resized: ${canvas.width}x${canvas.height} (using ${window.visualViewport ? 'visualViewport' : 'innerHeight'})`);
@@ -59,7 +58,7 @@
 
         const player = {
             x: canvas.width / 2 - 25,
-            y: canvas.height - 120, // Adjusted higher for iPhone safe areas (~120px from bottom)
+            y: canvas.height - 150, // Further adjusted for iPhone safe areas and Chrome (~150px from bottom)
             width: 50,
             height: 30,
             speed: 8,
@@ -76,7 +75,7 @@
             maxLightsaberEnergy: 300,
             lightsaberActive: false
         };
-        player.y = Math.max(0, Math.min(canvas.height - player.height * 4, canvas.height - 120)); // Dynamic, ~120px from bottom
+        player.y = Math.max(0, Math.min(canvas.height - player.height * 5, canvas.height - 150)); // Dynamic, ~150px from bottom
 
         let invaders = [];
         const invaderWidth = 60;
@@ -178,14 +177,16 @@
         });
 
         canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (touchActive) {
-                const touch = e.touches[0];
-                const deltaX = touch.clientX - touchStartX;
-                player.dx = deltaX > 0 ? player.speed : -player.speed;
-                if (Math.abs(deltaX) < 5) player.dx = 0;
-                console.log(`Touch move - deltaX: ${deltaX}, dx: ${player.dx}, player.x: ${player.x}`);
-                touchStartX = touch.clientX;
+            if (e.touches.length > 0) { // Ensure valid touch event
+                e.preventDefault();
+                if (touchActive) {
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - touchStartX;
+                    player.dx = deltaX > 0 ? player.speed : -player.speed;
+                    if (Math.abs(deltaX) < 5) player.dx = 0;
+                    console.log(`Touch move - deltaX: ${deltaX}, dx: ${player.dx}, player.x: ${player.x}`);
+                    touchStartX = touch.clientX;
+                }
             }
         });
 
