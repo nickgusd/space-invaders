@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Futurama Space Invaders - Max Width and Bosses</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Invaders</title>
     <style>
         body {
             margin: 0;
@@ -13,6 +14,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            touch-action: none; /* Prevent default touch behaviors */
         }
         canvas {
             display: block;
@@ -93,7 +95,12 @@
         let upPressed = false;
         let downPressed = false;
         let spacePressed = false;
-        let bossDefeatedThisLevel = false;
+
+        // Touch variables
+        let touchActive = false;
+        let touchStartX = 0;
+        let touchStartTime = 0;
+        const touchHoldThreshold = 500; // ms to trigger laser hold
 
         const omicronianImg = new Image();
         let omicronianLoaded = false;
@@ -148,6 +155,96 @@
             canvas.height = window.innerHeight;
             player.x = canvas.width / 2 - 25;
             player.y = Math.min(player.y, canvas.height - 50);
+        });
+
+        // Touch event listeners
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchActive = true;
+            touchStartX = touch.clientX;
+            touchStartTime = performance.now();
+            if (!isCharging) {
+                isCharging = true;
+                chargeTime = 0;
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (touchActive) {
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - touchStartX;
+                player.dx = deltaX > 0 ? player.speed : -player.speed;
+                if (Math.abs(deltaX) < 5) player.dx = 0; // Dead zone to prevent jitter
+                touchStartX = touch.clientX;
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchActive = false;
+            player.dx = 0;
+            const touchDuration = performance.now() - touchStartTime;
+            if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
+                if (touchDuration < touchHoldThreshold) { // Tap: shoot bullets
+                    const bulletWidth = Math.min(chargeTime * 3, 30);
+                    const bulletHeight = Math.min(chargeTime * 3, 50);
+                    const spread = player.multiShot > 1 ? 15 : 0;
+                    const shotCount = player.slurmCount >= 2 ? 5 : Math.min(3, level);
+                    for (let i = 0; i < shotCount; i++) {
+                        bullets.push({
+                            x: player.x + player.width / 2 - bulletWidth / 2 + (i - (shotCount - 1) / 2) * spread,
+                            y: player.y,
+                            width: bulletWidth,
+                            height: bulletHeight,
+                            damage: bulletWidth / 4
+                        });
+                    }
+                }
+            }
+            isCharging = false;
+            chargeTime = 0;
+        });
+
+        // Keyboard event listeners (full desktop functionality)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') rightPressed = true;
+            else if (e.key === 'ArrowLeft') leftPressed = true;
+            else if (e.key === 'ArrowUp') upPressed = true;
+            else if (e.key === 'ArrowDown') downPressed = true;
+            else if (e.key === ' ' && !isCharging) {
+                spacePressed = true;
+                isCharging = true;
+                chargeTime = 0;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowRight') rightPressed = false;
+            else if (e.key === 'ArrowLeft') leftPressed = false;
+            else if (e.key === 'ArrowUp') upPressed = false;
+            else if (e.key === 'ArrowDown') downPressed = false;
+            else if (e.key === ' ') {
+                spacePressed = false;
+                if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
+                    const bulletWidth = Math.min(chargeTime * 3, 30);
+                    const bulletHeight = Math.min(chargeTime * 3, 50);
+                    const spread = player.multiShot > 1 ? 15 : 0;
+                    const shotCount = player.slurmCount >= 2 ? 5 : Math.min(3, level);
+                    for (let i = 0; i < shotCount; i++) {
+                        bullets.push({
+                            x: player.x + player.width / 2 - bulletWidth / 2 + (i - (shotCount - 1) / 2) * spread,
+                            y: player.y,
+                            width: bulletWidth,
+                            height: bulletHeight,
+                            damage: bulletWidth / 4
+                        });
+                    }
+                }
+                isCharging = false;
+                chargeTime = 0;
+            }
         });
 
         function spawnInvaders() {
@@ -215,7 +312,7 @@
                     });
                 }
 
-                if (level >= 14 && ((level - 14) % 7 === 0)) { // Starts at 14, then every 7
+                if (level >= 14 && ((level - 14) % 7 === 0)) {
                     console.log(`Attempting to spawn lightsaber at Level ${level}`);
                     lightsaberItems.push({
                         x: Math.random() * (canvas.width - lightsaberWidth),
@@ -229,7 +326,7 @@
         }
 
         function spawnPowerUp() {
-            const spawnChance = Math.min(0.005 + level * 0.002, 0.03);
+            const spawnChance = Math.min(0.005 + level * 0.02, 0.03);
             if (Math.random() < spawnChance && powerUps.length < 1) {
                 powerUps.push({
                     x: Math.random() * (canvas.width - powerUpWidth),
@@ -242,7 +339,7 @@
         }
 
         function spawnHealthItem(x, y) {
-            if (!bossDefeatedThisLevel && level >= 10 && (level % 10 === 0)) { // Every other boss: 10, 20, 30
+            if (!bossDefeatedThisLevel && level >= 10 && (level % 10 === 0)) {
                 console.log(`Spawning health item at Level ${level}, x: ${x}, y: ${y}`);
                 console.log(`Before push - Health items count: ${healthItems.length}`);
                 healthItems.push({
@@ -260,62 +357,32 @@
 
         spawnInvaders();
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight') rightPressed = true;
-            else if (e.key === 'ArrowLeft') leftPressed = true;
-            else if (e.key === 'ArrowUp') upPressed = true;
-            else if (e.key === 'ArrowDown') downPressed = true;
-            else if (e.key === ' ' && !isCharging) {
-                spacePressed = true;
-                isCharging = true;
-                chargeTime = 0;
-            }
-        });
-
-        document.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowRight') rightPressed = false;
-            else if (e.key === 'ArrowLeft') leftPressed = false;
-            else if (e.key === 'ArrowUp') upPressed = false;
-            else if (e.key === 'ArrowDown') downPressed = false;
-            else if (e.key === ' ') {
-                spacePressed = false;
-                if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
-                    const bulletWidth = Math.min(chargeTime * 3, 30);
-                    const bulletHeight = Math.min(chargeTime * 3, 50);
-                    const spread = player.multiShot > 1 ? 15 : 0;
-                    const shotCount = player.slurmCount >= 2 ? 5 : Math.min(3, level);
-                    for (let i = 0; i < shotCount; i++) {
-                        bullets.push({
-                            x: player.x + player.width / 2 - bulletWidth / 2 + (i - (shotCount - 1) / 2) * spread,
-                            y: player.y,
-                            width: bulletWidth,
-                            height: bulletHeight,
-                            damage: bulletWidth / 4
-                        });
-                    }
-                }
-                isCharging = false;
-                chargeTime = 0;
-            }
-        });
-
         function update() {
             invaders.forEach(invader => invader.hitThisFrame = false);
 
             player.dx = 0;
             player.dy = 0;
+            // Desktop keyboard movement
             if (rightPressed && player.x < canvas.width - player.width) player.dx = player.speed;
             if (leftPressed && player.x > 0) player.dx = -player.speed;
             if (upPressed && player.y > 0) player.dy = -player.speed;
             if (downPressed && player.y < canvas.height - player.height) player.dy = player.speed;
+
+            // Mobile touch movement (overrides dx only)
+            if (touchActive) {
+                player.dx = player.dx; // Use touch dx from touchmove
+            }
+
             player.x += player.dx;
             player.y += player.dy;
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
 
             if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
                 chargeTime += 0.5;
             }
 
-            player.lightsaberActive = player.hasLightsaber && spacePressed && player.lightsaberEnergy > 0;
+            player.lightsaberActive = player.hasLightsaber && (spacePressed || (touchActive && performance.now() - touchStartTime > touchHoldThreshold)) && player.lightsaberEnergy > 0;
 
             if (player.multiShotTimer > 0) {
                 player.multiShotTimer--;
