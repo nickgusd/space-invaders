@@ -14,7 +14,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            touch-action: none; /* Reverted to 'none' for precise touch control */
+            touch-action: none; /* Ensures precise touch control */
         }
         canvas {
             display: block;
@@ -58,7 +58,7 @@
 
         const player = {
             x: canvas.width / 2 - 25,
-            y: canvas.height - 160, // Adjusted higher for Chrome (~160px from bottom)
+            y: canvas.height - 160, // Adjusted for Chrome (~160px from bottom)
             width: 50,
             height: 30,
             speed: 8,
@@ -112,7 +112,7 @@
         let touchActive = false;
         let touchStartX = 0;
         let touchStartTime = 0;
-        const touchHoldThreshold = 500;
+        const touchHoldThreshold = 300; // Reduced from 500ms to make laser easier to trigger
 
         const omicronianImg = new Image();
         let omicronianLoaded = false;
@@ -169,7 +169,7 @@
             touchActive = true;
             touchStartX = touch.clientX;
             touchStartTime = performance.now();
-            console.log(`Touch start at x: ${touchStartX}, y: ${touch.clientY}`);
+            console.log(`Touch start at x: ${touchStartX}, y: ${touch.clientY}, time: ${touchStartTime}`);
             if (!isCharging) {
                 isCharging = true;
                 chargeTime = 0;
@@ -197,26 +197,31 @@
             touchActive = false;
             player.dx = 0;
             const touchDuration = performance.now() - touchStartTime;
-            console.log(`Touch end - duration: ${touchDuration}ms`);
-            if (isCharging && (!player.hasLightsaber || player.lightsaberEnergy <= 0)) {
-                if (touchDuration < touchHoldThreshold) {
-                    const bulletWidth = Math.min(chargeTime * 3, 30);
-                    const bulletHeight = Math.min(chargeTime * 3, 50);
-                    const spread = player.multiShot > 1 ? 15 : 0;
-                    const shotCount = player.slurmCount >= 2 ? 5 : Math.min(3, level);
-                    for (let i = 0; i < shotCount; i++) {
-                        bullets.push({
-                            x: player.x + player.width / 2 - bulletWidth / 2 + (i - (shotCount - 1) / 2) * spread,
-                            y: player.y,
-                            width: bulletWidth,
-                            height: bulletHeight,
-                            damage: bulletWidth / 4
-                        });
+            console.log(`Touch end - duration: ${touchDuration}ms, lightsaberActive: ${player.lightsaberActive}, hasLightsaber: ${player.hasLightsaber}, energy: ${player.lightsaberEnergy}`);
+            if (isCharging) {
+                if (touchDuration < touchHoldThreshold) { // Tap: shoot bullets
+                    if (!player.hasLightsaber || player.lightsaberEnergy <= 0) {
+                        const bulletWidth = Math.min(chargeTime * 3, 30);
+                        const bulletHeight = Math.min(chargeTime * 3, 50);
+                        const spread = player.multiShot > 1 ? 15 : 0;
+                        const shotCount = player.slurmCount >= 2 ? 5 : Math.min(3, level);
+                        for (let i = 0; i < shotCount; i++) {
+                            bullets.push({
+                                x: player.x + player.width / 2 - bulletWidth / 2 + (i - (shotCount - 1) / 2) * spread,
+                                y: player.y,
+                                width: bulletWidth,
+                                height: bulletHeight,
+                                damage: bulletWidth / 4
+                            });
+                        }
                     }
+                } else if (player.hasLightsaber && player.lightsaberEnergy > 0) { // Hold: activate laser
+                    console.log(`Attempting to activate laser with duration: ${touchDuration}ms`);
                 }
             }
             isCharging = false;
             chargeTime = 0;
+            player.lightsaberActive = false; // Ensure laser deactivates on release
         });
 
         // Keyboard event listeners
@@ -256,6 +261,7 @@
                 }
                 isCharging = false;
                 chargeTime = 0;
+                player.lightsaberActive = false; // Ensure laser deactivates on release
             }
         });
 
@@ -395,7 +401,9 @@
                 chargeTime += 0.5;
             }
 
-            player.lightsaberActive = player.hasLightsaber && (spacePressed || (touchActive && performance.now() - touchStartTime > touchHoldThreshold)) && player.lightsaberEnergy > 0;
+            // Update laser activation for touch/keyboard
+            player.lightsaberActive = (player.hasLightsaber && player.lightsaberEnergy > 0) && 
+                (spacePressed || (touchActive && performance.now() - touchStartTime > touchHoldThreshold));
 
             if (player.multiShotTimer > 0) {
                 player.multiShotTimer--;
@@ -404,6 +412,7 @@
 
             if (player.lightsaberActive) {
                 player.lightsaberEnergy--;
+                console.log(`Laser active, energy: ${player.lightsaberEnergy}`);
                 if (player.lightsaberEnergy <= 0) {
                     player.hasLightsaber = false;
                     player.lightsaberActive = false;
@@ -608,6 +617,7 @@
             if (player.lightsaberActive) {
                 ctx.fillStyle = '#FF0000';
                 ctx.fillRect(player.x + player.width / 2 - 5, 0, 10, player.y);
+                console.log(`Rendering laser at x: ${player.x + player.width / 2 - 5}, y: 0 to ${player.y}`);
             }
 
             if (player.hasLightsaber && player.lightsaberEnergy > 0) {
