@@ -32,11 +32,13 @@
 
         const maxWidth = 1080;
         function updateCanvasSize() {
-            // Use visualViewport for mobile, fallback to innerHeight
+            // Use visualViewport for mobile, fallback to innerHeight for consistency
             const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            // Ensure minimum height for iPhone 14 Pro Max (~926px usable)
+            const safeHeight = Math.max(height, 926); // Adjust if needed
             canvas.width = Math.min(window.innerWidth, maxWidth);
-            canvas.height = height;
-            console.log(`Canvas resized: ${canvas.width}x${canvas.height}`);
+            canvas.height = safeHeight;
+            console.log(`Canvas resized: ${canvas.width}x${canvas.height} (using ${window.visualViewport ? 'visualViewport' : 'innerHeight'})`);
         }
         updateCanvasSize();
 
@@ -57,7 +59,7 @@
 
         const player = {
             x: canvas.width / 2 - 25,
-            y: canvas.height - 90, // Adjusted higher for iPhone safe areas
+            y: canvas.height - 120, // Adjusted higher for iPhone safe areas (~120px from bottom)
             width: 50,
             height: 30,
             speed: 8,
@@ -74,7 +76,7 @@
             maxLightsaberEnergy: 300,
             lightsaberActive: false
         };
-        player.y = Math.max(0, Math.min(canvas.height - player.height * 3, canvas.height - 90)); // Dynamic, ~90px from bottom
+        player.y = Math.max(0, Math.min(canvas.height - player.height * 4, canvas.height - 120)); // Dynamic, ~120px from bottom
 
         let invaders = [];
         const invaderWidth = 60;
